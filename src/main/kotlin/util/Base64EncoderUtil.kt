@@ -9,5 +9,4 @@ class Base64EncoderUtil {
             return Base64.getEncoder().encodeToString(hexString.hexStringToByteArray())
         }
     }
-
 }

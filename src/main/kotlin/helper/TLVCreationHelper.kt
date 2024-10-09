@@ -61,7 +61,9 @@ class TLVCreationHelper {
                     ),
                     ConstructedTLV(
                         tag = FieldTag.APPLICATION_SPECIFIC_TRANSPARENT_TEMPLATE,
-                        length = appSpecsTransTemplate.sumOf { it.serialize().length / 2 }.lengthToHexString(),
+                        length = appSpecsTransTemplate.sumOf {
+                            it.serialize().length / 2
+                        }.lengthToHexString(),
                         value = appSpecsTransTemplate
                     )
                 )
