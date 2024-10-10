@@ -11,21 +11,19 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 
 class QCATQrTicketing {
+        private val PAYLOAD_FORMAT_INDICATOR = "85"
+        private val APPLICATION_TEMPLATE = "61"
+        private val ADF = "4F"
+        private val APPLICATION_SPECIFIC_TRANSPARENT_TEMPLATE = "63"
 
-    companion object {
-        private const val PAYLOAD_FORMAT_INDICATOR = "85"
-        private const val APPLICATION_TEMPLATE = "61"
-        private const val ADF = "4F"
-        private const val APPLICATION_SPECIFIC_TRANSPARENT_TEMPLATE = "63"
+        private val TICKET_ID = "C1"
+        private val CREATOR_ID = "C2"
+        private val CREATION_TIME = "C3"
+        private val VALIDITY_PERIOD = "C4"
 
-        private const val TICKET_ID = "C1"
-        private const val CREATOR_ID = "C2"
-        private const val CREATION_TIME = "C3"
-        private const val VALIDITY_PERIOD = "C4"
+        private val SIGNATURE = "DE"
 
-        private const val SIGNATURE = "DE"
-
-        private const val BASE64_DATA_IMAGE_PREFIX = "data:image/png;base64"
+        private val BASE64_DATA_IMAGE_PREFIX = "data:image/png;base64"
 
         private fun Int.toHexString(): String {
             return this.toString(16).uppercase().let { if(it.length % 2 != 0) "0$it" else it }
@@ -94,15 +92,16 @@ class QCATQrTicketing {
 
             return "$BASE64_DATA_IMAGE_PREFIX, ${Base64.getEncoder().encodeToString(stream.toByteArray())}"
         }
-    }
+    
 
-    private sealed class TLV(val tag: String?, val length: String?) {
+    private sealed class TLV(val tag: String?) {
         abstract fun serialize(): String
     }
 
-    private inner class SimpleTLV(tag: String?, length: String?, val value: String): TLV(tag, length) {
+    private inner class SimpleTLV(tag: String?, val value: String): TLV(tag) {
         override fun serialize(): String {
-            return if (tag != null && length != null){
+            val length = (value.toHexString().length / 2).lengthToHexString()
+            return if (tag != null){
                 String.format("%s%s%s", tag, length, value)
             } else {
                 String.format("%s", value)
@@ -110,10 +109,13 @@ class QCATQrTicketing {
         }
     }
 
-    private inner class ConstructedTLV(tag: String? = null, length: String? = null, val value: List<TLV>): TLV(tag, length) {
+    private inner class ConstructedTLV(tag: String? = null, val value: List<TLV>): TLV(tag) {
         override fun serialize(): String {
             val nestedValues = value.joinToString("") { it.serialize() }
-            return if (tag != null && length != null) {
+            val length = value.sumOf {
+                it.serialize().length / 2
+            }.lengthToHexString()
+            return if (tag != null) {
                 String.format("%s%s%s", tag, length, nestedValues)
             } else {
                 String.format("%s", nestedValues)
@@ -121,12 +123,17 @@ class QCATQrTicketing {
         }
     }
 
-    fun generateQrCode(ticketDataPayload: TicketDataPayload): String {
-        val ticketIdHex = ticketDataPayload.ticketId?.toHexString()
-        val creatorIdHex = ticketDataPayload.creatorId?.toHexString()
-        val creationTimeHex = ticketDataPayload.creationTime?.toISO8601DateTime()?.toHexString()
-        val validityPeriodHex = ticketDataPayload.validityPeriod?.toISO8601Duration()?.toHexString()
-        val signatureHex = ticketDataPayload.signature
+    fun generateQrCode(ticketId: Int?,
+                       creatorId: Int?,
+                       creationTime: String?,
+                       validityPeriod: String?,
+                       signature: String?): String {
+
+        val ticketIdHex = ticketId!!.toHexString()
+        val creatorIdHex =creatorId?.toHexString()
+        val creationTimeHex = creationTime?.toISO8601DateTime()?.toHexString()
+        val validityPeriodHex = validityPeriod?.toISO8601Duration()?.toHexString()
+        val signatureHex = signature
 
         val adf = "QCAT01"
         val ADFHex = adf.toHexString()
@@ -135,28 +142,26 @@ class QCATQrTicketing {
             listOf(
                 SimpleTLV(
                     tag = TICKET_ID,
-                    length = (ticketIdHex!!.length / 2).lengthToHexString(),
                     value = ticketIdHex
                 ),
                 SimpleTLV(
                     tag = CREATOR_ID,
-                    length = (creatorIdHex!!.length / 2).lengthToHexString(),
-                    value = creatorIdHex
+
+                    value = creatorIdHex!!
                 ),
                SimpleTLV(
                     tag = CREATION_TIME,
-                    length = (creationTimeHex!!.length / 2).lengthToHexString(),
-                    value = creationTimeHex
+
+                    value = creationTimeHex!!
                 ),
                 SimpleTLV(
                     tag = VALIDITY_PERIOD,
-                    length = (validityPeriodHex!!.length / 2).lengthToHexString(),
-                    value = validityPeriodHex
+
+                    value = validityPeriodHex!!
                 ),
                 SimpleTLV(
                     tag = SIGNATURE,
-                    length = (signatureHex!!.length / 2).lengthToHexString(),
-                    value = signatureHex
+                    value = signatureHex!!
                 )
             )
 
@@ -164,14 +169,11 @@ class QCATQrTicketing {
             listOf(
                 SimpleTLV(
                     tag = ADF,
-                    length = (ADFHex.length / 2).lengthToHexString(),
                     value = ADFHex
                 ),
                 ConstructedTLV(
                     tag = APPLICATION_SPECIFIC_TRANSPARENT_TEMPLATE,
-                    length = appSpecsTransTemplate.sumOf {
-                        it.serialize().length / 2
-                    }.lengthToHexString(),
+
                     value = appSpecsTransTemplate
                 )
             )
@@ -180,15 +182,13 @@ class QCATQrTicketing {
         val payloadFormatIndicatorHex = payloadFormatIndicator.toHexString()
 
         val serializedTlv =  ConstructedTLV(
-            null, null, listOf(
+            null, listOf(
                 SimpleTLV(
                     tag = PAYLOAD_FORMAT_INDICATOR,
-                    length = (payloadFormatIndicatorHex.length / 2).lengthToHexString(),
                     value = payloadFormatIndicatorHex
                 ),
                 ConstructedTLV(
                     tag = APPLICATION_TEMPLATE,
-                    length = appTemplate.sumOf { it.serialize().length / 2 }.lengthToHexString(),
                     value = appTemplate
                 )
             )
@@ -197,5 +197,21 @@ class QCATQrTicketing {
         val base64EncodedData = toBase64String(serializedTlv)
         val qrCodeImage = toQrCodeImage(base64EncodedData)
         return qrCodeImage
+    }
+
+    inner class BuildQr{
+        private var ticketId: Int? = null
+        private var creatorId: Int? = null
+        private var creationTime: String? = null
+        private var validityPeriod: String? = null
+        private var signature: String? = null
+
+        fun setTicketId(ticketId: Int?) = apply { this.ticketId = ticketId }
+        fun setCreatorId(creatorId: Int?) = apply { this.creatorId = creatorId }
+        fun setCreationTime(creationTime: String?) = apply { this.creationTime = creationTime }
+        fun setValidityPeriod(validityPeriod: String?) = apply { this.validityPeriod = validityPeriod }
+        fun setSignature(signature: String?) = apply { this.signature = signature }
+
+        fun generate() = generateQrCode(ticketId, creatorId, creationTime, validityPeriod, signature)
     }
 }

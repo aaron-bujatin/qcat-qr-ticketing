@@ -1,6 +1,4 @@
 package org.example
-
-import org.example.helper.BeepQrTicketHelper
 import org.example.model.TicketDataPayload
 
 fun main(){
@@ -13,12 +11,27 @@ fun main(){
         signature = "023034021859527B7951E77EB6CB250149FFA2006B1A415297D13AA48A021840986DC05DB2235088DB4599389823A324842E73A635B3FD"
     )
 
-    val v1 = BeepQrTicketHelper()
-    val resultV1 = v1.createQrCodeTicket(ticketDataPayload)
-    val v2= QCATQrTicketing()
-    val resultV2 = v2.generateQrCode(ticketDataPayload)
 
-    println("resultV1: $resultV1")
-    println("resultV2: $resultV2")
+    val v1= QCATQrTicketing()
+    val v2= QCATQrTicketingTwo()
+
+    val result1 = v1.BuildQr()
+        .setTicketId(ticketDataPayload.ticketId)
+        .setCreatorId(ticketDataPayload.creatorId)
+        .setCreationTime(ticketDataPayload.creationTime)
+        .setValidityPeriod(ticketDataPayload.validityPeriod)
+        .setSignature(ticketDataPayload.signature)
+        .generate()
+
+    val result2 = v2.BuildQr()
+        .setTicketId(ticketDataPayload.ticketId)
+        .setCreatorId(ticketDataPayload.creatorId)
+        .setCreationTime(ticketDataPayload.creationTime)
+        .setValidityPeriod(ticketDataPayload.validityPeriod)
+        .setSignature(ticketDataPayload.signature)
+        .generate()
+
+    println("resultv1 : $result1")
+    println("resultv2 : $result2")
 
 }
